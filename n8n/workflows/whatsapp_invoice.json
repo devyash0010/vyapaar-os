@@ -1,0 +1,58 @@
+{
+  "name": "Vyapaar WhatsApp Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vyapaar-invoice",
+        "options": {}
+      },
+      "id": "webhook-node-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [ 250, 300 ]
+    },
+    {
+      "parameters": {
+        "phoneNumberId": "YOUR_META_PHONE_ID",
+        "recipientPhoneNumber": "={{ $json.body.customer_phone }}",
+        "template": "invoice_dispatch_01",
+        "language": "en_US",
+        "components": {
+          "component": [
+            {
+              "type": "body",
+              "parameters": {
+                "parameter": [
+                  { "type": "text", "text": "={{ $json.body.customer_name }}" },
+                  { "type": "text", "text": "={{ $json.body.invoice_id }}" },
+                  { "type": "text", "text": "={{ $json.body.grand_total }}" }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "whatsapp-node-1",
+      "name": "WhatsApp Business",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [ 500, 300 ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1",
+          "name": "WhatsApp Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [ { "node": "WhatsApp Business", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": true
+}

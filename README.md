@@ -1,0 +1,14 @@
+// Paste your code here
+# Backend Configurations
+MONGODB_URL=mongodb://l
+ocalhost:27017/vyapaar_core
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=generate_a_secure_random_string_here
+PORT=8000
+
+# AI Configuration
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# n8n Configuration
+WEBHOOK_URL=http://localhost:5678/
+N8N_ENCRYPTION_KEY=your_n8n_encryption_key
