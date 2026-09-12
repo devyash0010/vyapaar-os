@@ -1,9 +1,9 @@
-// Paste your code here
+
 version: '3.8'
 
 services:
   api:
-    build: 
+    build:
       context: ./backend
     ports:
       - "8000:8000"
@@ -12,6 +12,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:-production_secret_key_93847298347}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,api}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
     depends_on:
       - mongodb
       - redis
