@@ -120,9 +120,9 @@ export default function POS() {
   };
 
   return (
-    <div className="h-[calc(100vh-6.5rem)] flex flex-col lg:flex-row gap-5">
+    <div className="min-h-[calc(100vh-7rem)] lg:h-[calc(100vh-6.5rem)] flex flex-col lg:flex-row gap-5 pb-16 lg:pb-0">
       {/* Left Column: Catalog & Products */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white border border-slate-200 rounded-xl p-5 shadow-sm overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm overflow-hidden">
         {/* Top Controls */}
         <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center pb-4 border-b border-slate-100">
           <div>
@@ -210,8 +210,25 @@ export default function POS() {
         </div>
       </div>
 
+      {/* Mobile Floating Cart Summary */}
+      {cart.length > 0 && (
+        <div className="lg:hidden fixed bottom-16 inset-x-3 z-20">
+          <button 
+            type="button"
+            onClick={() => document.getElementById('cart-checkout-section')?.scrollIntoView({ behavior: 'smooth' })}
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg flex items-center justify-between font-bold text-xs active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
+              <span>{cart.reduce((s, i) => s + i.qty, 0)} Items Added</span>
+            </div>
+            <span>Review & Pay ₹{grandTotal.toFixed(2)} →</span>
+          </button>
+        </div>
+      )}
+
       {/* Right Column: Cart, Customer & Checkout */}
-      <div className="w-full lg:w-[420px] flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden shrink-0">
+      <div id="cart-checkout-section" className="w-full lg:w-[420px] flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden shrink-0">
         {/* Cart Header & Customer Form */}
         <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
           <div className="flex justify-between items-center">

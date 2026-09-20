@@ -40,3 +40,4 @@ services:
           type: web
           name: vyapaar-os-backend
           property: host
+
