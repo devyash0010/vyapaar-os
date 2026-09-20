@@ -1,4 +1,3 @@
-
 version: '3.8'
 
 services:
@@ -9,9 +8,11 @@ services:
       - "8000:8000"
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/vyapaar_core
+      - DATABASE_NAME=${DATABASE_NAME:-vyapaar_core}
       - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-${JWT_SECRET:-production_secret_key_93847298347}}
       - JWT_SECRET=${JWT_SECRET:-production_secret_key_93847298347}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,api}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
     depends_on:

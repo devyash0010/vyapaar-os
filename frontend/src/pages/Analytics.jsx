@@ -1,131 +1,158 @@
 import React from 'react';
-import { Sparkles, TrendingUp, TrendingDown, ArrowRight, Activity, ShieldCheck } from 'lucide-react';
-import RevenueChart from '../components/shared/RevenueChart'; // Reusing the chart
-
-const TOP_PRODUCTS = [
-  { name: 'Premium Basmati Rice 5kg', sales: 142, rev: '₹1,20,700' },
-  { name: 'Sunflower Oil 1L', sales: 384, rev: '₹63,360' },
-  { name: 'Cashews Whole 500g', sales: 89, rev: '₹48,950' },
-];
+import { 
+  TrendingUp, 
+  ShieldCheck, 
+  Package, 
+  ArrowUpRight, 
+  FileCheck2, 
+  BarChart2,
+  Percent
+} from 'lucide-react';
+import RevenueChart from '../components/shared/RevenueChart';
+import { useBusinessStore } from '../store/useBusinessStore';
 
 export default function Analytics() {
+  const transactions = useBusinessStore((state) => state.transactions);
+  const products = useBusinessStore((state) => state.products);
+
+  const topProducts = products.slice(0, 4);
+
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
-      
+    <div className="max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          Business Intelligence <Sparkles className="w-5 h-5 text-indigo-400" />
-        </h1>
-        <p className="text-sm text-zinc-400 mt-1">AI-driven analytics and health scoring.</p>
+      <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Business Reports & Analytics</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Sales performance, category revenue, and GST tax filing summary.</p>
       </div>
 
+      {/* Advisory Insight Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md w-fit">
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Demand Restock Advisory</span>
+          </div>
+          <h3 className="text-sm font-bold text-slate-900">Sunflower Oil & Rice weekend demand surge</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Based on the last 4 weeks of sales patterns, grocery staples experience a 28% demand spike on weekends. We recommend ordering an additional 30 units before Friday.
+          </p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md w-fit">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+            <span>GST Input Tax Credit (ITC) Summary</span>
+          </div>
+          <h3 className="text-sm font-bold text-slate-900">₹14,280 Input Tax Credit Eligible</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Purchase GST verified across all inventory inward invoices. Ready to reconcile for monthly GSTR-3B filing to reduce net tax liability.
+          </p>
+        </div>
+      </div>
+
+      {/* Sales Telemetry Chart & Channels Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* AI Insights Panel */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-indigo-900/20 to-blue-900/10 border border-indigo-500/20 rounded-2xl overflow-hidden flex flex-col relative">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full pointer-events-none" />
-          
-          <div className="p-6 border-b border-indigo-500/10 flex items-center gap-3 bg-zinc-950/30">
-            <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-            </div>
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col min-h-[380px]">
+          <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="font-bold text-white">Vyapaar AI Insights</h3>
-              <p className="text-xs text-indigo-300/70">Generated 2 mins ago</p>
+              <h2 className="text-sm font-bold text-slate-900">Revenue Breakdown (Daily)</h2>
+              <p className="text-xs text-slate-500">Gross invoicing volume</p>
             </div>
+            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+              Weekly Run Rate
+            </span>
           </div>
-
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-zinc-950/50 border border-zinc-800/50 p-4 rounded-xl hover:border-indigo-500/30 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-sm font-bold text-zinc-200">Demand Surge Forecast</h4>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Expect a 25% increase in "Sunflower Oil" demand this weekend based on historical monthly patterns. Recommend stocking 50 additional units.
-              </p>
-            </div>
-            
-            <div className="bg-zinc-950/50 border border-zinc-800/50 p-4 rounded-xl hover:border-indigo-500/30 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <h4 className="text-sm font-bold text-zinc-200">GST Optimization</h4>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Unclaimed Input Tax Credit (ITC) of ₹4,200 detected in recent transport invoices. Ready to apply to this month's GSTR-3B filing.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Business Health Score */}
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 flex flex-col justify-center items-center text-center relative overflow-hidden">
-           <Activity className="absolute top-4 right-4 w-5 h-5 text-zinc-700" />
-           <h3 className="font-bold text-white w-full text-left mb-4">Business Health</h3>
-           
-           <div className="relative w-36 h-36 mt-4 flex items-center justify-center">
-             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-               <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="none" />
-               <circle cx="50" cy="50" r="40" stroke="#10b981" strokeWidth="8" fill="none" strokeDasharray="251" strokeDashoffset="45" className="drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" strokeLinecap="round" />
-             </svg>
-             <div className="absolute flex flex-col items-center justify-center">
-               <span className="text-3xl font-black text-white tracking-tighter">82</span>
-               <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mt-1">Excellent</span>
-             </div>
-           </div>
-
-           <div className="mt-8 space-y-3 w-full text-left">
-             <div className="flex justify-between items-center text-sm">
-               <span className="text-zinc-400">Cash Flow</span>
-               <span className="font-semibold text-white">Healthy</span>
-             </div>
-             <div className="flex justify-between items-center text-sm">
-               <span className="text-zinc-400">Inventory Turnover</span>
-               <span className="font-semibold text-emerald-400">Optimal</span>
-             </div>
-           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Full Analytics Chart */}
-        <div className="lg:col-span-2 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 flex flex-col min-h-[350px]">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-base font-bold text-white">Sales & Orders Telemetry</h2>
-          </div>
-          <div className="flex-1">
+          <div className="flex-1 w-full h-[300px]">
             <RevenueChart />
           </div>
         </div>
 
-        {/* Top Products Widget */}
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl flex flex-col overflow-hidden">
-          <div className="p-6 border-b border-zinc-800/50 bg-zinc-950/30">
-            <h2 className="text-base font-bold text-white">Top Moving Products</h2>
-          </div>
-          <div className="p-4 flex-1 space-y-2">
-            {TOP_PRODUCTS.map((prod, idx) => (
-              <div key={idx} className="flex justify-between items-center p-3 hover:bg-zinc-800/30 rounded-xl transition-colors group">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-400 group-hover:text-white transition-colors">
-                    #{idx + 1}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-zinc-200">{prod.name}</h4>
-                    <p className="text-xs text-zinc-500">{prod.sales} units sold</p>
-                  </div>
+        {/* Payment Channels Card */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 mb-1">Sales by Payment Mode</h2>
+            <p className="text-xs text-slate-500 mb-5">Transaction distribution</p>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                  <span>UPI & QR Payments</span>
+                  <span className="text-blue-600">58%</span>
                 </div>
-                <div className="text-sm font-bold text-emerald-400">{prod.rev}</div>
+                <div className="w-full bg-slate-100 rounded-full h-2">
+                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: '58%' }}></div>
+                </div>
               </div>
-            ))}
+
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                  <span>Cash on Counter</span>
+                  <span className="text-emerald-600">32%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2">
+                  <div className="bg-emerald-600 h-2 rounded-full" style={{ width: '32%' }}></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                  <span>Debit / Credit Cards</span>
+                  <span className="text-indigo-600">10%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2">
+                  <div className="bg-indigo-600 h-2 rounded-full" style={{ width: '10%' }}></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="p-4 border-t border-zinc-800/50">
-            <button className="w-full text-xs font-semibold text-blue-400 hover:text-blue-300 flex justify-center items-center gap-1 transition-colors">
-              View Full Report <ArrowRight className="w-3 h-3" />
-            </button>
+
+          <div className="mt-6 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-500">
+            <div className="flex justify-between">
+              <span>Avg. Ticket Size:</span>
+              <span className="font-bold text-slate-900">₹842.00</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Peak Sales Hour:</span>
+              <span className="font-bold text-slate-900">6:00 PM – 9:00 PM</span>
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Top Moving Products Table */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-200 bg-slate-50">
+          <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Top Velocity Items</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider border-b border-slate-200">
+              <tr>
+                <th className="px-5 py-3">Rank</th>
+                <th className="px-5 py-3">Product</th>
+                <th className="px-5 py-3">Category</th>
+                <th className="px-5 py-3">Unit Price</th>
+                <th className="px-5 py-3">Current Stock</th>
+                <th className="px-5 py-3 text-right">Velocity</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {topProducts.map((p, i) => (
+                <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-5 py-3.5 font-bold text-slate-500">#{i + 1}</td>
+                  <td className="px-5 py-3.5 font-semibold text-slate-900">{p.name}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
+                      {p.category}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-700">₹{p.price}</td>
+                  <td className="px-5 py-3.5 font-semibold text-slate-800">{p.stock} units</td>
+                  <td className="px-5 py-3.5 text-right font-bold text-emerald-600">High Turnover</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

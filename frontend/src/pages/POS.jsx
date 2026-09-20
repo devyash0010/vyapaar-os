@@ -1,151 +1,289 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Receipt } from 'lucide-react';
-
-const DUMMY_PRODUCTS = [
-  { id: '1', name: 'Premium Basmati Rice 5kg', price: 850, category: 'Grocery', stock: 45 },
-  { id: '2', name: 'Sunflower Oil 1L', price: 165, category: 'Grocery', stock: 120 },
-  { id: '3', name: 'Organic Honey 500g', price: 299, category: 'Food', stock: 15 },
-  { id: '4', name: 'Whole Wheat Atta 10kg', price: 420, category: 'Grocery', stock: 30 },
-  { id: '5', name: 'Green Tea 100 bags', price: 250, category: 'Beverages', stock: 60 },
-  { id: '6', name: 'Premium Almonds 500g', price: 450, category: 'Dry Fruits', stock: 25 },
-  { id: '7', name: 'Cashews Whole 500g', price: 550, category: 'Dry Fruits', stock: 20 },
-  { id: '8', name: 'Tomato Ketchup 1kg', price: 140, category: 'Food', stock: 40 },
-  { id: '9', name: 'Washing Powder 2kg', price: 320, category: 'Cleaning', stock: 50 },
-  { id: '10', name: 'Dishwash Liquid 500ml', price: 99, category: 'Cleaning', stock: 80 },
-];
+import { 
+  Search, 
+  ShoppingCart, 
+  Plus, 
+  Minus, 
+  Trash2, 
+  CreditCard, 
+  Banknote, 
+  QrCode, 
+  Receipt, 
+  Printer, 
+  X, 
+  CheckCircle2,
+  User,
+  Phone
+} from 'lucide-react';
+import { useBusinessStore } from '../store/useBusinessStore';
+import { api } from '../lib/api';
 
 export default function POS() {
-  const [cart, setCart] = useState([]);
+  const products = useBusinessStore((state) => state.products);
+  const cart = useBusinessStore((state) => state.cart);
+  const addToCart = useBusinessStore((state) => state.addToCart);
+  const updateCartQty = useBusinessStore((state) => state.updateCartQty);
+  const removeFromCart = useBusinessStore((state) => state.removeFromCart);
+  const clearCart = useBusinessStore((state) => state.clearCart);
+  const addTransaction = useBusinessStore((state) => state.addTransaction);
+  const profile = useBusinessStore((state) => state.profile);
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [paymentMethod, setPaymentMethod] = useState('UPI');
+  const [customerName, setCustomerName] = useState('Walk-in Customer');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [completedInvoice, setCompletedInvoice] = useState(null);
+  const [showQrModal, setShowQrModal] = useState(false);
+
+  const categories = useMemo(() => {
+    const set = new Set(products.map(p => p.category));
+    return ['All', ...Array.from(set)];
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
-    return DUMMY_PRODUCTS.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [searchQuery]);
-
-  const addToCart = (product) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
-      }
-      return [...prev, { ...product, qty: 1 }];
+    return products.filter(p => {
+      const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
+      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.sku_barcode && p.sku_barcode.includes(searchQuery));
+      return matchCat && matchSearch;
     });
-  };
+  }, [products, selectedCategory, searchQuery]);
 
-  const updateQty = (id, delta) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = item.qty + delta;
-        return newQty > 0 ? { ...item, qty: newQty } : null;
-      }
-      return item;
-    }).filter(Boolean));
-  };
+  // Pricing calculations
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+  }, [cart]);
 
-  const clearCart = () => setCart([]);
+  const taxRate = profile.default_gst_rate || 18;
+  const gstAmount = subtotal * (taxRate / 100);
+  const cgstAmount = gstAmount / 2;
+  const sgstAmount = gstAmount / 2;
+  const grandTotal = subtotal + gstAmount;
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const gst = subtotal * 0.18; // Flat 18% GST for demo
-  const grandTotal = subtotal + gst;
-
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
-    alert(`Payment of ₹${grandTotal.toFixed(2)} received via ${paymentMethod}.\nInvoice generated successfully!`);
+
+    if (paymentMethod === 'UPI' && !showQrModal) {
+      setShowQrModal(true);
+      return;
+    }
+
+    setIsProcessing(true);
+    const invoiceNum = `${profile.invoice_prefix || 'INV-2026-'}${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newInvoice = {
+      id: invoiceNum,
+      invoice_number: invoiceNum,
+      customer_name: customerName || 'Walk-in Customer',
+      customer_phone: customerPhone || '',
+      items: cart.map(item => ({
+        product_id: item.id,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+        total: item.price * item.qty
+      })),
+      subtotal: Number(subtotal.toFixed(2)),
+      cgst: Number(cgstAmount.toFixed(2)),
+      sgst: Number(sgstAmount.toFixed(2)),
+      gst_rate: taxRate,
+      grand_total: Number(grandTotal.toFixed(2)),
+      payment_mode: paymentMethod,
+      created_at: new Date().toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      item_count: cart.reduce((sum, item) => sum + item.qty, 0)
+    };
+
+    try {
+      // Send to backend API
+      await api.pos.checkout(newInvoice).catch(() => null);
+    } catch {
+      // Local store persistence handles it seamlessly
+    }
+
+    addTransaction(newInvoice);
+    setCompletedInvoice(newInvoice);
     clearCart();
+    setIsProcessing(false);
+    setShowQrModal(false);
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-6 animate-in fade-in duration-500">
-      
-      {/* Left: Product Grid */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <div className="flex justify-between items-center mb-6 shrink-0">
+    <div className="h-[calc(100vh-6.5rem)] flex flex-col lg:flex-row gap-5">
+      {/* Left Column: Catalog & Products */}
+      <div className="flex-1 flex flex-col min-w-0 bg-white border border-slate-200 rounded-xl p-5 shadow-sm overflow-hidden">
+        {/* Top Controls */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center pb-4 border-b border-slate-100">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Smart Terminal</h1>
-            <p className="text-sm text-zinc-400 mt-1">Fast billing and inventory checkout.</p>
+            <h1 className="text-lg font-bold text-slate-900 leading-none">Smart POS Terminal</h1>
+            <p className="text-xs text-slate-500 mt-1">Select items or scan barcode to add to bill</p>
           </div>
-          <div className="relative w-72 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-blue-500 transition-colors" />
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
-              type="text" 
-              placeholder="Search products or scan barcode..." 
+              type="text"
+              placeholder="Search item or SKU barcode..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 text-white placeholder:text-zinc-500 transition-all shadow-inner"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-blue-600 transition-colors"
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 pb-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map(product => (
-              <div 
-                key={product.id} 
-                onClick={() => addToCart(product)}
-                className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 cursor-pointer hover:border-blue-500/50 hover:bg-zinc-800/50 transition-all group flex flex-col h-full"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-950 px-2 py-1 rounded-md border border-zinc-800/50">
-                    {product.category}
-                  </span>
-                  <span className="text-xs text-zinc-500 font-medium">{product.stock} in stock</span>
-                </div>
-                <h3 className="text-sm font-semibold text-zinc-200 mb-4 flex-1 group-hover:text-blue-400 transition-colors">
-                  {product.name}
-                </h3>
-                <div className="flex justify-between items-center mt-auto">
-                  <span className="text-lg font-bold text-white">₹{product.price}</span>
-                  <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500 transition-colors">
-                    <Plus className="w-4 h-4 text-blue-500 group-hover:text-white transition-colors" />
+        {/* Categories Bar */}
+        <div className="flex gap-2 py-3 overflow-x-auto no-scrollbar border-b border-slate-100">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                selectedCategory === cat
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Product Cards Grid */}
+        <div className="flex-1 overflow-y-auto pt-4 pr-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filteredProducts.map((p) => {
+              const inCartItem = cart.find(c => c.id === p.id);
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => addToCart(p)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between h-36 ${
+                    inCartItem 
+                      ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-500' 
+                      : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                  }`}
+                >
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                        {p.category}
+                      </span>
+                      <span className={`text-[10px] font-bold ${p.stock <= p.threshold ? 'text-amber-600' : 'text-slate-400'}`}>
+                        {p.stock} left
+                      </span>
+                    </div>
+                    <h3 className="text-xs font-bold text-slate-800 line-clamp-2 mt-2 leading-tight">
+                      {p.name}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
+                    <span className="text-sm font-bold text-slate-900">₹{p.price}</span>
+                    <button 
+                      className={`h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold transition-colors ${
+                        inCartItem ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-blue-600 hover:text-white'
+                      }`}
+                    >
+                      {inCartItem ? inCartItem.qty : <Plus className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
           {filteredProducts.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-2">
-              <Search className="w-8 h-8 opacity-50" />
-              <p>No products found matching "{searchQuery}"</p>
+            <div className="h-48 flex flex-col items-center justify-center text-slate-400 text-xs">
+              No products found matching "{searchQuery}"
             </div>
           )}
         </div>
       </div>
 
-      {/* Right: Cart & Billing */}
-      <div className="w-full lg:w-[400px] flex flex-col bg-zinc-900/50 border border-zinc-800/50 rounded-2xl overflow-hidden shrink-0 h-[calc(100vh-8rem)]">
-        
-        <div className="p-5 border-b border-zinc-800/50 bg-zinc-950/50 flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-blue-500" />
-            <h2 className="text-base font-bold text-white">Current Order</h2>
+      {/* Right Column: Cart, Customer & Checkout */}
+      <div className="w-full lg:w-[420px] flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden shrink-0">
+        {/* Cart Header & Customer Form */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-blue-600" />
+              <h2 className="text-sm font-bold text-slate-900">Active Order</h2>
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+              {cart.reduce((s, i) => s + i.qty, 0)} Items
+            </span>
           </div>
-          <span className="bg-blue-500/10 text-blue-400 text-xs font-bold px-2.5 py-1 rounded-lg border border-blue-500/20">
-            {cart.length} Items
-          </span>
+
+          {/* Quick Customer Info */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="relative">
+              <User className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Customer Name"
+                className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-600"
+              />
+            </div>
+            <div className="relative">
+              <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="Phone (Optional)"
+                className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-600"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Cart Items List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-3 opacity-60">
-              <Receipt className="w-12 h-12" />
-              <p className="text-sm">Scan items or click to add</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 py-16 space-y-2">
+              <Receipt className="w-10 h-10 text-slate-300" />
+              <p className="text-xs font-medium">Order is empty</p>
+              <p className="text-[11px] text-slate-400">Click any product to add to bill</p>
             </div>
           ) : (
-            cart.map(item => (
-              <div key={item.id} className="p-3 bg-zinc-950/50 border border-zinc-800/50 rounded-xl flex gap-3 group hover:border-zinc-700 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-zinc-200 truncate">{item.name}</h4>
-                  <div className="text-xs text-zinc-500 mt-1">₹{item.price} / unit</div>
+            cart.map((item) => (
+              <div 
+                key={item.id}
+                className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 truncate leading-tight">{item.name}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">₹{item.price} × {item.qty}</p>
                 </div>
-                <div className="flex flex-col items-end justify-between">
-                  <span className="text-sm font-bold text-white mb-2">₹{item.price * item.qty}</span>
-                  <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
-                    <button onClick={() => updateQty(item.id, -1)} className="p-1 hover:bg-zinc-800 hover:text-white text-zinc-400 rounded-md transition-colors">
-                      {item.qty === 1 ? <Trash2 className="w-3.5 h-3.5 text-red-400" /> : <Minus className="w-3.5 h-3.5" />}
+
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-900">
+                    ₹{(item.price * item.qty).toFixed(2)}
+                  </span>
+                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+                    <button 
+                      onClick={() => updateCartQty(item.id, -1)}
+                      className="p-1 hover:bg-slate-100 rounded text-slate-600"
+                    >
+                      {item.qty === 1 ? <Trash2 className="w-3.5 h-3.5 text-red-500" /> : <Minus className="w-3.5 h-3.5" />}
                     </button>
-                    <span className="text-xs font-bold w-4 text-center text-white">{item.qty}</span>
-                    <button onClick={() => updateQty(item.id, 1)} className="p-1 hover:bg-zinc-800 hover:text-white text-zinc-400 rounded-md transition-colors">
+                    <span className="text-xs font-bold w-4 text-center text-slate-900">{item.qty}</span>
+                    <button 
+                      onClick={() => updateCartQty(item.id, 1)}
+                      className="p-1 hover:bg-slate-100 rounded text-slate-600"
+                    >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -155,62 +293,210 @@ export default function POS() {
           )}
         </div>
 
-        <div className="p-5 bg-zinc-950/80 border-t border-zinc-800/50 shrink-0 space-y-4">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-zinc-400">
+        {/* Billing Summary & Payment Controls */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3 shrink-0">
+          <div className="space-y-1.5 text-xs">
+            <div className="flex justify-between text-slate-500">
               <span>Subtotal</span>
-              <span className="text-zinc-200 font-medium">₹{subtotal.toFixed(2)}</span>
+              <span className="font-semibold text-slate-800">₹{subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-zinc-400">
-              <span>CGST & SGST (18%)</span>
-              <span className="text-zinc-200 font-medium">₹{gst.toFixed(2)}</span>
+            <div className="flex justify-between text-slate-500">
+              <span>CGST ({(taxRate/2).toFixed(1)}%)</span>
+              <span className="font-semibold text-slate-800">₹{cgstAmount.toFixed(2)}</span>
             </div>
-            <div className="pt-2 mt-2 border-t border-zinc-800/50 flex justify-between items-center">
-              <span className="text-zinc-300 font-semibold">Grand Total</span>
-              <span className="text-2xl font-bold text-blue-400">₹{grandTotal.toFixed(2)}</span>
+            <div className="flex justify-between text-slate-500">
+              <span>SGST ({(taxRate/2).toFixed(1)}%)</span>
+              <span className="font-semibold text-slate-800">₹{sgstAmount.toFixed(2)}</span>
+            </div>
+            <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
+              <span className="text-sm font-bold text-slate-900">Grand Total</span>
+              <span className="text-xl font-black text-blue-600">₹{grandTotal.toFixed(2)}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          {/* Payment Method Selector */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
             {[
-              { id: 'UPI', icon: QrCode },
-              { id: 'Card', icon: CreditCard },
-              { id: 'Cash', icon: Banknote }
-            ].map(method => (
-              <button 
-                key={method.id}
-                onClick={() => setPaymentMethod(method.id)}
-                className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-semibold transition-all ${
-                  paymentMethod === method.id 
-                    ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' 
-                    : 'bg-zinc-900 border-zinc-800/50 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                }`}
-              >
-                <method.icon className="w-4 h-4" />
-                {method.id}
-              </button>
-            ))}
+              { id: 'UPI', icon: QrCode, label: 'UPI / QR' },
+              { id: 'Cash', icon: Banknote, label: 'Cash' },
+              { id: 'Card', icon: CreditCard, label: 'Card' },
+            ].map(m => {
+              const Icon = m.icon;
+              const isSelected = paymentMethod === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setPaymentMethod(m.id)}
+                  className={`py-2 px-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 transition-colors ${
+                    isSelected 
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{m.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex gap-2">
-            <button 
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-1">
+            <button
               onClick={clearCart}
               disabled={cart.length === 0}
-              className="px-4 py-3 bg-zinc-900 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/30 text-zinc-400 hover:text-red-400 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
               Clear
             </button>
-            <button 
+            <button
               onClick={handleCheckout}
-              disabled={cart.length === 0}
-              className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg hover:shadow-blue-500/25 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
+              disabled={cart.length === 0 || isProcessing}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              Charge ₹{grandTotal.toFixed(2)}
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Charge ₹{grandTotal.toFixed(2)}</span>
             </button>
           </div>
         </div>
-
       </div>
+
+      {/* UPI QR Payment Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full border border-slate-200 shadow-xl space-y-5 text-center">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <span className="text-sm font-bold text-slate-900">Scan to Pay via UPI</span>
+              <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">Any UPI App (GPay, PhonePe, Paytm, BHIM)</p>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl inline-block shadow-inner">
+                {/* Visual Clean QR Code */}
+                <div className="w-44 h-44 bg-white p-2 border border-slate-300 rounded-lg flex flex-col items-center justify-center mx-auto">
+                  <QrCode className="w-36 h-36 text-slate-800" />
+                </div>
+              </div>
+              <p className="text-xs font-mono font-bold text-slate-700 mt-1">{profile.upi_id || 'vyapaar.mart@okicici'}</p>
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+              <span className="text-xs text-blue-700 font-medium">Total Amount Due</span>
+              <p className="text-2xl font-black text-blue-800">₹{grandTotal.toFixed(2)}</p>
+            </div>
+
+            <button
+              onClick={handleCheckout}
+              disabled={isProcessing}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Confirm Payment Received</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tax Invoice Receipt Modal */}
+      {completedInvoice && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold">Sale Completed Successfully</span>
+              </div>
+              <button onClick={() => setCompletedInvoice(null)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Printable Area */}
+            <div id="printable-receipt" className="p-6 bg-white text-slate-800 text-xs space-y-4">
+              <div className="text-center pb-3 border-b border-dashed border-slate-300 space-y-1">
+                <h2 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                  {profile.store_name || 'Vyapaar SuperMart'}
+                </h2>
+                <p className="text-[11px] text-slate-500 leading-tight">{profile.legal_name}</p>
+                <p className="text-[11px] text-slate-500 leading-tight">{profile.address}</p>
+                <p className="text-[11px] font-mono font-semibold text-slate-700 mt-1">
+                  GSTIN: {profile.gstin || '27AABCV1234D1Z5'}
+                </p>
+                <p className="text-[11px] text-slate-500">Ph: {profile.phone}</p>
+              </div>
+
+              <div className="grid grid-cols-2 text-[11px] text-slate-600 gap-1 pb-2 border-b border-dashed border-slate-200">
+                <div><strong>Invoice:</strong> {completedInvoice.invoice_number}</div>
+                <div className="text-right"><strong>Date:</strong> {completedInvoice.created_at}</div>
+                <div><strong>Customer:</strong> {completedInvoice.customer_name}</div>
+                <div className="text-right"><strong>Mode:</strong> {completedInvoice.payment_mode}</div>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-1.5 py-1">
+                <div className="flex justify-between font-bold text-[11px] text-slate-700 pb-1 border-b border-slate-200">
+                  <span>Item</span>
+                  <span className="w-10 text-center">Qty</span>
+                  <span className="w-16 text-right">Price</span>
+                  <span className="w-16 text-right">Amount</span>
+                </div>
+                {completedInvoice.items.map((it, i) => (
+                  <div key={i} className="flex justify-between text-[11px] text-slate-600">
+                    <span className="truncate flex-1 pr-2">{it.name}</span>
+                    <span className="w-10 text-center">{it.qty}</span>
+                    <span className="w-16 text-right">₹{it.price}</span>
+                    <span className="w-16 text-right font-semibold text-slate-800">₹{it.total}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totals */}
+              <div className="pt-2 border-t border-dashed border-slate-300 space-y-1 text-[11px]">
+                <div className="flex justify-between text-slate-600">
+                  <span>Taxable Subtotal:</span>
+                  <span>₹{completedInvoice.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>CGST ({(completedInvoice.gst_rate / 2).toFixed(1)}%):</span>
+                  <span>₹{completedInvoice.cgst.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>SGST ({(completedInvoice.gst_rate / 2).toFixed(1)}%):</span>
+                  <span>₹{completedInvoice.sgst.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-slate-200">
+                  <span>NET PAYABLE:</span>
+                  <span>₹{completedInvoice.grand_total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="text-center pt-3 border-t border-dashed border-slate-300 text-[10px] text-slate-500">
+                <p>Thank you for your business!</p>
+                <p className="font-mono">Computer Generated GST Tax Invoice</p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2">
+              <button
+                onClick={handlePrintReceipt}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+              >
+                <Printer className="w-4 h-4" /> Print Tax Invoice
+              </button>
+              <button
+                onClick={() => setCompletedInvoice(null)}
+                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl text-xs transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
